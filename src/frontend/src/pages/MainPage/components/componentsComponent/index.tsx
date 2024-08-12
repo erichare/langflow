@@ -1,4 +1,5 @@
 import { usePostDownloadMultipleFlows } from "@/controllers/API/queries/flows";
+import useDeleteFlow from "@/hooks/flows/use-delete-flow";
 import { useEffect, useMemo, useState } from "react";
 import { FormProvider, useForm, useWatch } from "react-hook-form";
 import { useLocation } from "react-router-dom";
@@ -16,7 +17,6 @@ import { sortFlows } from "../../utils/sort-flows";
 import EmptyComponent from "../emptyComponent";
 import HeaderComponent from "../headerComponent";
 import CollectionCard from "./components/collectionCard";
-import useDeleteMultipleFlows from "./hooks/use-delete-multiple";
 import useDescriptionModal from "./hooks/use-description-modal";
 import useFilteredFlows from "./hooks/use-filtered-flows";
 import useDuplicateFlows from "./hooks/use-handle-duplicate";
@@ -29,8 +29,6 @@ export default function ComponentsComponent({
 }: {
   type?: string;
 }) {
-  const uploadFlow = useFlowsManagerStore((state) => state.uploadFlow);
-  const removeFlow = useFlowsManagerStore((state) => state.removeFlow);
   const isLoading = useFlowsManagerStore((state) => state.isLoading);
   const setAllFlows = useFlowsManagerStore((state) => state.setAllFlows);
   const allFlows = useFlowsManagerStore((state) => state.allFlows);
@@ -54,7 +52,7 @@ export default function ComponentsComponent({
     (state) => state.selectedFlowsComponentsCards,
   );
 
-  const [handleFileDrop] = useFileDrop(uploadFlow, type)!;
+  const handleFileDrop = useFileDrop(type);
   const [pageSize, setPageSize] = useState(20);
   const [pageIndex, setPageIndex] = useState(1);
   const location = useLocation();
@@ -70,7 +68,6 @@ export default function ComponentsComponent({
   const myCollectionId = useFolderStore((state) => state.myCollectionId);
   const getFoldersApi = useFolderStore((state) => state.getFoldersApi);
   const setFolderUrl = useFolderStore((state) => state.setFolderUrl);
-  const addFlow = useFlowsManagerStore((state) => state.addFlow);
   const isLoadingFolders = useFolderStore((state) => state.isLoadingFolders);
   const setSelectedFolder = useFolderStore((state) => state.setSelectedFolder);
 
@@ -90,6 +87,7 @@ export default function ComponentsComponent({
     setFolderUrl(folderId ?? "");
     setSelectedFlowsComponentsCards([]);
     handleSelectAll(false);
+    setShouldSelectAll(true);
     getFolderById(folderId ? folderId : myCollectionId);
   }, [location]);
 
@@ -113,7 +111,6 @@ export default function ComponentsComponent({
 
   const { handleDuplicate } = useDuplicateFlows(
     selectedFlowsComponentsCards,
-    addFlow,
     allFlows,
     resetFilter,
     getFoldersApi,
@@ -188,19 +185,29 @@ export default function ComponentsComponent({
     handleExport,
   );
 
-  const { handleDeleteMultiple } = useDeleteMultipleFlows(
-    selectedFlowsComponentsCards,
-    removeFlow,
-    resetFilter,
-    getFoldersApi,
-    folderId,
-    myCollectionId!,
-    getFolderById,
-    setSuccessData,
-    setErrorData,
-    setAllFlows,
-    setSelectedFolder,
-  );
+  const deleteFlow = useDeleteFlow();
+
+  const handleDeleteMultiple = () => {
+    deleteFlow({ id: selectedFlowsComponentsCards })
+      .then(() => {
+        setAllFlows([]);
+        setSelectedFolder(null);
+        resetFilter();
+        getFoldersApi(true);
+        if (!folderId || folderId === myCollectionId) {
+          getFolderById(folderId ? folderId : myCollectionId);
+        }
+        setSuccessData({
+          title: "Selected items deleted successfully",
+        });
+      })
+      .catch((e) => {
+        setErrorData({
+          title: "Error deleting items",
+          list: ["Please try again"],
+        });
+      });
+  };
 
   useSelectedFlows(entireFormValues, setSelectedFlowsComponentsCards);
 
